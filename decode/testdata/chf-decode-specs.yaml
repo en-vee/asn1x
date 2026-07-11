@@ -14,3 +14,7 @@ asn1x:
       asn1DataType: GeneralizedTime
     - fieldPath: chargingFunctionRecord.pDUSessionChargingInformation.pDUSessionstopTime
       asn1DataType: GeneralizedTime
+    - fieldPath: chargingFunctionRecord.pDUSessionChargingInformation.uETimeZone
+      asn1DataType: MSTimeZone
+    - fieldPath: chargingFunctionRecord.listOfMultipleUnitUsage.usedUnitContainers.pDUContainerInformation.uETimeZone
+      asn1DataType: MSTimeZone
