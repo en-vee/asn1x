@@ -3,12 +3,21 @@ package decode
 import "testing"
 
 func TestDecodeMSTimeZone0400(t *testing.T) {
-	// Kafka / charging wire format: hex "0400" → +10:00 (semi-octet BCD).
 	val, err := decodeMSTimeZone([]byte{0x04, 0x00})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if val != "+10:00" {
+	if val != "+10:00+0" {
+		t.Fatalf("got %#v", val)
+	}
+}
+
+func TestDecodeMSTimeZone0401(t *testing.T) {
+	val, err := decodeMSTimeZone([]byte{0x04, 0x01})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != "+10:00+1" {
 		t.Fatalf("got %#v", val)
 	}
 }
@@ -18,7 +27,17 @@ func TestDecodeMSTimeZoneOneHour(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if val != "+01:00" {
+	if val != "+01:00+0" {
+		t.Fatalf("got %#v", val)
+	}
+}
+
+func TestDecodeMSTimeZoneDSTTwoHours(t *testing.T) {
+	val, err := decodeMSTimeZone([]byte{0x04, 0x02})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != "+10:00+2" {
 		t.Fatalf("got %#v", val)
 	}
 }
@@ -28,19 +47,35 @@ func TestDecodeMSTimeZoneText(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if val != "+10:00" {
+	if val != "+10:00+0" {
+		t.Fatalf("got %#v", val)
+	}
+}
+
+func TestDecodeMSTimeZoneTextWithDST(t *testing.T) {
+	val, err := decodeMSTimeZone([]byte("+10:00+1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != "+10:00+1" {
 		t.Fatalf("got %#v", val)
 	}
 }
 
 func TestDecodeMSTimeZoneNegative(t *testing.T) {
-	// Wireshark example: 0x4A → GMT-6
 	val, err := decodeMSTimeZone([]byte{0x4a, 0x00})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if val != "-06:00" {
+	if val != "-06:00+0" {
 		t.Fatalf("got %#v", val)
+	}
+}
+
+func TestDecodeMSTimeZoneReservedDST(t *testing.T) {
+	_, err := decodeMSTimeZone([]byte{0x04, 0x03})
+	if err == nil {
+		t.Fatal("expected error for reserved DST value")
 	}
 }
 
