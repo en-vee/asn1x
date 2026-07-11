@@ -127,19 +127,31 @@ func readLength(data []byte, off int) (int, int, error) {
 	return length, off, nil
 }
 
-// DecodeInteger decodes a BER INTEGER content octet string.
+// DecodeInteger decodes a BER INTEGER content octet string as signed.
 func DecodeInteger(content []byte) (int64, error) {
 	if len(content) == 0 {
 		return 0, fmt.Errorf("ber: empty integer")
 	}
 	var n int64
- negative := content[0]&0x80 != 0
+	negative := content[0]&0x80 != 0
 	for _, b := range content {
 		n = (n << 8) | int64(b)
 	}
 	if negative {
 		bits := uint(len(content) * 8)
 		n -= int64(1) << bits
+	}
+	return n, nil
+}
+
+// DecodeIntegerUnsigned decodes a BER INTEGER content octet string as unsigned.
+func DecodeIntegerUnsigned(content []byte) (uint64, error) {
+	if len(content) == 0 {
+		return 0, fmt.Errorf("ber: empty integer")
+	}
+	var n uint64
+	for _, b := range content {
+		n = (n << 8) | uint64(b)
 	}
 	return n, nil
 }

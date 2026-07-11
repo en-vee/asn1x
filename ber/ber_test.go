@@ -36,3 +36,13 @@ func TestDecodeInteger(t *testing.T) {
 		t.Fatalf("got %d", n)
 	}
 }
+
+func TestDecodeIntegerUnsigned(t *testing.T) {
+	n, err := ber.DecodeIntegerUnsigned([]byte{0xe0, 0x63, 0x07, 0xcc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 3764586444 {
+		t.Fatalf("got %d", n)
+	}
+}

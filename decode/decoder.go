@@ -230,14 +230,7 @@ func (d *Decoder) decodePrimitive(t schema.Type, content []byte) (any, error) {
 	t = d.resolve(t)
 	switch typ := t.(type) {
 	case schema.IntegerType:
-		n, err := ber.DecodeInteger(content)
-		if err != nil {
-			return nil, err
-		}
-		if name := namedNumber(typ.NamedNumbers, int(n)); name != "" {
-			return name, nil
-		}
-		return n, nil
+		return decodeIntegerType(content, typ)
 	case schema.EnumeratedType:
 		n, err := ber.DecodeInteger(content)
 		if err != nil {
