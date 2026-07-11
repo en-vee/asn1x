@@ -1,3 +1,5 @@
 asn1x.darwin
+asn1x.linux
+asn1x.exe
 sample-asn1-files/
 .DS_Store

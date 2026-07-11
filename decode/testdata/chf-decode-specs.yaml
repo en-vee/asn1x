@@ -1,7 +1,7 @@
 asn1x:
   decodeSpecs:
     - fieldPath: chargingFunctionRecord.recordOpeningTime
-      asn1DataType: GeneralizedTime
+      asn1DataType: TimeStamp
     - fieldPath: chargingFunctionRecord.listOfMultipleUnitUsage.usedUnitContainers.triggerTimeStamp
       asn1DataType: GeneralizedTime
     - fieldPath: chargingFunctionRecord.listOfMultipleUnitUsage.usedUnitContainers.eventTimeStamp

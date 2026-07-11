@@ -19,7 +19,7 @@ func TestLoadFieldSpecs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if specs["chargingFunctionRecord.recordOpeningTime"] != "GeneralizedTime" {
+	if specs["chargingFunctionRecord.recordOpeningTime"] != "TimeStamp" {
 		t.Fatalf("recordOpeningTime path = %q", specs["chargingFunctionRecord.recordOpeningTime"])
 	}
 	if len(specs) < 5 {

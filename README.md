@@ -165,7 +165,7 @@ for len(data) > 0 {
 
 ### Per-field decode overrides
 
-Some deployments encode values differently from what the schema declares (for example, timestamps carried as `OCTET STRING` containing ASCII ISO-8601 text instead of BER `GeneralizedTime`). Use a YAML specs file and pass it to the decoder:
+Some deployments encode values differently from what the schema declares (for example, timestamps carried as 9-byte BCD `TimeStamp` octet strings instead of BER `GeneralizedTime`). Use a YAML specs file and pass it to the decoder:
 
 ```go
 specs, err := asn1x.LoadFieldSpecsFile("decode/testdata/chf-decode-specs.yaml")
@@ -186,17 +186,18 @@ YAML format:
 asn1x:
   decodeSpecs:
     - fieldPath: chargingFunctionRecord.recordOpeningTime
-      asn1DataType: GeneralizedTime
+      asn1DataType: TimeStamp
     - fieldPath: chargingFunctionRecord.listOfMultipleUnitUsage.usedUnitContainers.pDUContainerInformation.timeOfFirstUsage
-      asn1DataType: GeneralizedTime
+      asn1DataType: TimeStamp
 ```
 
 Each `fieldPath` must be a **qualified** dot-separated path matching the JSON structure (at least one `.` segment is required). Supported `asn1DataType` values include:
 
 | Type | Behavior |
 |------|----------|
-| `UTCTime` | Parse UTCTime or GeneralizedTime text; output RFC3339 UTC |
-| `GeneralizedTime` | Parse ISO-8601 / GeneralizedTime text; output RFC3339 UTC |
+| `TimeStamp` | 3GPP 9-byte BCD timestamp (`YYMMDDhhmmssShhmm`), or ASCII time text; output RFC3339 UTC |
+| `UTCTime` | Parse UTCTime or GeneralizedTime text, or 9-byte BCD TimeStamp; output RFC3339 UTC |
+| `GeneralizedTime` | Parse ISO-8601 / GeneralizedTime text, or 9-byte BCD TimeStamp; output RFC3339 UTC |
 | `IA5String`, `UTF8String`, … | Force string decoding |
 | `Integer` | Force BER integer decoding |
 | `OctetString` | Default octet-string handling (text vs hex heuristic) |
