@@ -1,0 +1,16 @@
+asn1x:
+  decodeSpecs:
+    - fieldPath: chargingFunctionRecord.recordOpeningTime
+      asn1DataType: GeneralizedTime
+    - fieldPath: chargingFunctionRecord.listOfMultipleUnitUsage.usedUnitContainers.triggerTimeStamp
+      asn1DataType: GeneralizedTime
+    - fieldPath: chargingFunctionRecord.listOfMultipleUnitUsage.usedUnitContainers.eventTimeStamp
+      asn1DataType: GeneralizedTime
+    - fieldPath: chargingFunctionRecord.listOfMultipleUnitUsage.usedUnitContainers.pDUContainerInformation.timeOfFirstUsage
+      asn1DataType: GeneralizedTime
+    - fieldPath: chargingFunctionRecord.listOfMultipleUnitUsage.usedUnitContainers.pDUContainerInformation.timeOfLastUsage
+      asn1DataType: GeneralizedTime
+    - fieldPath: chargingFunctionRecord.pDUSessionChargingInformation.pDUSessionstartTime
+      asn1DataType: GeneralizedTime
+    - fieldPath: chargingFunctionRecord.pDUSessionChargingInformation.pDUSessionstopTime
+      asn1DataType: GeneralizedTime

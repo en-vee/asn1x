@@ -1,0 +1,29 @@
+MyModule DEFINITIONS ::=
+BEGIN
+
+Status ::= ENUMERATED {
+    active (0),
+    inactive (1)
+}
+
+Record ::= CHOICE {
+    call [1] IMPLICIT SEQUENCE {
+        recordType [0] IMPLICIT INTEGER {
+            moCallRecord (0),
+            mtCallRecord (1)
+        },
+        duration [1] IMPLICIT INTEGER OPTIONAL,
+        connected [2] IMPLICIT BOOLEAN DEFAULT TRUE
+    },
+    sms [2] IMPLICIT SET {
+        messageId [0] IMPLICIT OCTET STRING
+    }
+}
+
+RecordList ::= SEQUENCE OF Record
+
+Flags ::= SET OF BOOLEAN
+
+RefExample ::= SomeExternalType
+
+END
