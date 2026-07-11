@@ -60,6 +60,11 @@ func formatMSTimeZone(offset string, dst int) string {
 	return offset + fmt.Sprintf("+%d", dst)
 }
 
+// FormatMSTimeZoneOctets formats a 2-octet 3GPP MS Time Zone value (e.g. 0x04, 0x01 → +10:00+1).
+func FormatMSTimeZoneOctets(octet0, octet1 byte) (string, error) {
+	return decodeMSTimeZone([]byte{octet0, octet1})
+}
+
 func formatOffsetFromQuarterHours(units int) string {
 	sign := "+"
 	if units < 0 {
