@@ -62,3 +62,13 @@ func NewDecoderWithOptions(s *schema.Schema, opts DecodeOptions) *Decoder {
 	}
 	return &Decoder{schema: s, fieldSpecs: specs}
 }
+
+func (d *Decoder) lookupFieldSpec(fieldPath, fieldName string) (string, bool) {
+	if spec, ok := d.fieldSpecs[fieldPath]; ok {
+		return spec, true
+	}
+	if spec, ok := d.fieldSpecs["*."+fieldName]; ok {
+		return spec, true
+	}
+	return "", false
+}

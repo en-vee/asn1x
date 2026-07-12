@@ -17,6 +17,8 @@ func decodeWithSpecType(typeName string, content []byte) (any, error) {
 		return decodeTimeValue(content, true)
 	case "MSTimeZone", "TimeZone":
 		return decodeMSTimeZone(content)
+	case "PLMNID", "PLMNIdentifier", "PLMN":
+		return decodePLMNID(content)
 	case "IA5String", "UTF8String", "PrintableString", "VisibleString", "NumericString":
 		return string(content), nil
 	case "Integer":
@@ -38,6 +40,8 @@ func normalizeSpecType(typeName string) string {
 		return "TimeStamp"
 	case "mstimezone", "timezone":
 		return "MSTimeZone"
+	case "plmnid", "plmnidentifier", "plmn":
+		return "PLMNID"
 	case "ia5string":
 		return "IA5String"
 	case "utf8string":

@@ -18,3 +18,9 @@ asn1x:
       asn1DataType: MSTimeZone
     - fieldPath: chargingFunctionRecord.listOfMultipleUnitUsage.usedUnitContainers.pDUContainerInformation.uETimeZone
       asn1DataType: MSTimeZone
+    - fieldPath: "*.networkFunctionPLMNIdentifier"
+      asn1DataType: PLMNID
+    - fieldPath: "*.sUPIPLMNIdentifier"
+      asn1DataType: PLMNID
+    - fieldPath: "*.servingCNPLMNID"
+      asn1DataType: PLMNID

@@ -132,7 +132,7 @@ func (d *Decoder) tagMatchesComponent(comp schema.Component, tag ber.Tag) bool {
 
 func (d *Decoder) decodeComponent(comp schema.Component, tlv ber.TLV, path string) (any, error) {
 	fieldPath := joinFieldPath(path, comp.Name)
-	if specType, ok := d.fieldSpecs[fieldPath]; ok {
+	if specType, ok := d.lookupFieldSpec(fieldPath, comp.Name); ok {
 		content, err := d.componentContent(comp, tlv)
 		if err != nil {
 			return nil, fmt.Errorf("decode: field %q: %w", fieldPath, err)
