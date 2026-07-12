@@ -8,6 +8,7 @@ Go library and command-line utility for parsing ASN.1 schema definitions and dec
 - Schema-driven BER decoding with field names taken from the schema
 - JSON output with sensible type mappings (SEQUENCE/SET → object, SEQUENCE OF/SET OF → array, CHOICE → single-key object)
 - Optional per-field decode overrides via YAML (`fieldPath` + `asn1DataType`) for cases where the on-wire encoding does not match the schema type
+- `grep` subcommand to find CDR records matching a decoded field value across files or directories
 - `asn1x` CLI built with [Cobra](https://github.com/spf13/cobra)
 
 JSON-to-ASN.1 encoding is not implemented yet.
@@ -121,6 +122,98 @@ Show help:
 ```bash
 asn1x --help
 asn1x decode --help
+```
+
+### Search CDR files (`grep`)
+
+Find records whose **decoded** JSON contains a specific field value. Matching uses the same schema and decode-specs as `decode`, so values like `TimeStamp`, `MSTimeZone`, and `PLMNID` are compared after transformation — not as raw BER bytes.
+
+Pass a **single file** or a **directory** as the positional argument. Directories are searched recursively.
+
+```bash
+asn1x grep \
+  --schema schema/testdata/CHFChargingDataTypes.EXP \
+  --type CHFRecord \
+  --decode-specs decode/testdata/chf-decode-specs.yaml \
+  --json-path 'chargingFunctionRecord.listOfMultipleUnitUsage.usedUnitContainers.pDUContainerInformation.uETimeZone==+10:00+1' \
+  sample-asn1-files
+```
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--schema` | yes | Path to the ASN.1 schema file |
+| `--type` | yes | Root type name to decode (e.g. `CHFRecord`) |
+| `--json-path` | yes | Field filter in the form `field.path==value` |
+| `--decode-specs` | no | Path to a YAML file with per-field decode overrides |
+| `--limit` | no | Maximum number of records to scan per file (`0` = all) |
+| `--file-header` | no | Input contains a 3GPP TS 32.297 CDR file header (default: `true`) |
+| `--cdr-header` | no | Each record is prefixed with a 3GPP TS 32.297 CDR record header (default: `true`) |
+| `--print-matches` | no | Also print decoded JSON for each matching record (default: `false`) |
+| `--compact` | no | Emit compact JSON when `--print-matches` is set |
+
+**Filter syntax:** `--json-path` uses `field.path==value`. Path segments match decoded JSON field names. Arrays along the path are searched — a match in any element satisfies the filter.
+
+**Output:** One line per match on stdout:
+
+```text
+filename:recordNumber
+```
+
+Exit status is non-zero when no matches are found.
+
+#### Examples
+
+Search a single CDR file for a specific duration:
+
+```bash
+asn1x grep \
+  --schema schema/testdata/CHFChargingDataTypes.EXP \
+  --type CHFRecord \
+  --decode-specs decode/testdata/chf-decode-specs.yaml \
+  --file-header=false \
+  --cdr-header=false \
+  --json-path 'chargingFunctionRecord.duration==148' \
+  sample-asn1-files/iot-1.ber
+```
+
+Search a 3GPP CDR file for records with a given SMF trigger:
+
+```bash
+asn1x grep \
+  --schema schema/testdata/CHFChargingDataTypes.EXP \
+  --type CHFRecord \
+  --decode-specs decode/testdata/chf-decode-specs.yaml \
+  --json-path 'chargingFunctionRecord.listOfMultipleUnitUsage.usedUnitContainers.triggers.sMFTrigger==endOfPDUSession' \
+  sample-asn1-files/iot-sftp-sink-m3c1-0_-_000001.20260709_-_125346+1000
+```
+
+Search by PLMN (requires `PLMNID` entries in decode-specs):
+
+```bash
+asn1x grep \
+  --schema schema/testdata/CHFChargingDataTypes.EXP \
+  --type CHFRecord \
+  --decode-specs decode/testdata/chf-decode-specs.yaml \
+  --json-path 'chargingFunctionRecord.nFunctionConsumerInformation.networkFunctionPLMNIdentifier.mcc==505' \
+  sample-asn1-files
+```
+
+Print matching records as JSON:
+
+```bash
+asn1x grep \
+  --schema schema/testdata/CHFChargingDataTypes.EXP \
+  --type CHFRecord \
+  --decode-specs decode/testdata/chf-decode-specs.yaml \
+  --json-path 'chargingFunctionRecord.duration==148' \
+  --print-matches \
+  sample-asn1-files/iot-1.ber
+```
+
+Show help:
+
+```bash
+asn1x grep --help
 ```
 
 ## Library usage
