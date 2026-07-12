@@ -22,4 +22,5 @@ to find records matching a decoded field value.`,
 func init() {
 	rootCmd.AddCommand(newDecodeCmd())
 	rootCmd.AddCommand(newGrepCmd())
+	rootCmd.AddCommand(newVersionCmd())
 }
