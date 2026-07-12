@@ -14,10 +14,12 @@ var rootCmd = &cobra.Command{
 	Short: "Decode ASN.1 BER data using ASN.1 schema definitions",
 	Long: `asn1x parses ASN.1 schema files and decodes BER-encoded data into JSON.
 
-Use the decode command to transform one or more concatenated BER records.`,
+Use the decode command to transform one or more concatenated BER records, or grep
+to find records matching a decoded field value.`,
 	SilenceUsage: true,
 }
 
 func init() {
 	rootCmd.AddCommand(newDecodeCmd())
+	rootCmd.AddCommand(newGrepCmd())
 }
