@@ -48,23 +48,29 @@ asn1x decode \
 | `--decode-specs` | no | Path to a YAML file with per-field decode overrides |
 | `--limit` | no | Maximum number of records to decode (`0` = all) |
 | `--compact` | no | Emit compact JSON instead of indented output |
-| `--file-header` | no | Input contains a 3GPP TS 32.297 CDR file header (clause 6.1.1) |
-| `--cdr-header` | no | Each record is prefixed with a 3GPP TS 32.297 CDR record header (clause 6.1.2) |
+| `--file-header` | no | Input contains a 3GPP TS 32.297 CDR file header (default: `true`) |
+| `--cdr-header` | no | Each record is prefixed with a 3GPP TS 32.297 CDR record header (default: `true`) |
+| `--suppress-file-header` | no | Do not print parsed file header metadata (default: `false`) |
+| `--suppress-cdr-header` | no | Do not print parsed CDR record header metadata (default: `false`) |
 
 The BER file is passed as a positional argument.
 
-**Output:** CDR JSON is written to stdout. When the input contains multiple records, each record is printed on its own line (JSONL). Progress is reported on stderr (`decoded N record(s)`).
+**Output:** Header metadata (when present and not suppressed), a `CDR #N` banner before each record, and CDR JSON are written to **stdout**. Progress is reported on stderr (`decoded N record(s)`).
 
-When `--file-header` and/or `--cdr-header` are set, header metadata is printed to stderr as JSON before the corresponding CDR output. These flags are intended for 3GPP CDR **files** only; they do not apply when decoding individual BER records from a Kafka topic or similar stream.
+`--file-header` and `--cdr-header` control **input framing** (whether those bytes are skipped before decode). `--suppress-*` controls **printing only** — headers are still parsed and consumed when framing is enabled.
+
+For raw back-to-back BER records (no 3GPP file wrapper), pass `--file-header=false --cdr-header=false`. These flags do not apply when decoding individual BER records from a Kafka topic or similar stream.
 
 ### Examples
 
-Decode the first record only:
+Decode the first record only (raw BER stream, no 3GPP file headers):
 
 ```bash
 asn1x decode \
   --schema schema/testdata/CHFChargingDataTypes.EXP \
   --type CHFRecord \
+  --file-header=false \
+  --cdr-header=false \
   --limit 1 \
   sample-asn1-files/vvsl22183_-_87150.20220429_._1113+1000.asn1
 ```
@@ -79,26 +85,35 @@ asn1x decode \
   sample-asn1-files/vvsl22183_-_87150.20220429_._1113+1000.asn1 > records.jsonl
 ```
 
-Decode a 3GPP TS 32.297 CDR file with a file header but no per-record CDR headers:
+Decode a 3GPP TS 32.297 CDR file (default framing; headers printed to stdout):
 
 ```bash
 asn1x decode \
   --schema schema/testdata/CHFChargingDataTypes.EXP \
   --type CHFRecord \
-  --file-header=true \
-  --cdr-header=false \
+  --decode-specs decode/testdata/chf-decode-specs.yaml \
   cdr-file.dat
 ```
 
-Decode a CDR file with both file and record headers (header JSON on stderr, CDR JSON on stdout):
+Decode a CDR file but omit header metadata from the output:
 
 ```bash
 asn1x decode \
   --schema schema/testdata/CHFChargingDataTypes.EXP \
   --type CHFRecord \
-  --file-header=true \
-  --cdr-header=true \
-  cdr-file.dat 2> headers.jsonl > records.jsonl
+  --suppress-file-header=true \
+  --suppress-cdr-header=true \
+  cdr-file.dat
+```
+
+Decode a CDR file with a file header but no per-record CDR headers:
+
+```bash
+asn1x decode \
+  --schema schema/testdata/CHFChargingDataTypes.EXP \
+  --type CHFRecord \
+  --cdr-header=false \
+  cdr-file.dat
 ```
 
 Show help:

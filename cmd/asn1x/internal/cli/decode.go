@@ -12,29 +12,35 @@ import (
 )
 
 type decodeOptions struct {
-	schemaPath      string
-	rootType        string
-	limit           int
-	compact         bool
-	decodeSpecsPath string
-	fileHeader      bool
-	cdrHeader       bool
+	schemaPath         string
+	rootType           string
+	limit              int
+	compact            bool
+	decodeSpecsPath    string
+	fileHeader         bool
+	cdrHeader          bool
+	suppressFileHeader bool
+	suppressCDRHeader  bool
 }
 
 func newDecodeCmd() *cobra.Command {
-	opts := &decodeOptions{}
+	opts := &decodeOptions{
+		fileHeader: true,
+		cdrHeader:  true,
+	}
 
 	cmd := &cobra.Command{
 		Use:   "decode <ber-file>",
 		Short: "Decode BER-encoded ASN.1 values to JSON",
 		Long: `Decode BER-encoded ASN.1 values using a schema and print JSON to stdout.
 
-When the input contains multiple back-to-back values, each record is printed
-on its own line (JSONL).
+When the input contains multiple records, each is preceded by a CDR #N banner
+followed by indented or compact JSON.
 
-For 3GPP TS 32.297 CDR files, use --file-header and/or --cdr-header to declare
-the presence of the file header and per-record CDR headers. Header metadata is
-printed to stderr as JSON before each decoded CDR record.`,
+For 3GPP TS 32.297 CDR files, --file-header and --cdr-header declare the input
+framing (both default to true). Use --suppress-file-header and/or
+--suppress-cdr-header to skip printing parsed header metadata while still
+skipping those bytes during decode.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDecode(opts, args[0])
@@ -46,8 +52,10 @@ printed to stderr as JSON before each decoded CDR record.`,
 	cmd.Flags().IntVar(&opts.limit, "limit", 0, "maximum number of records to decode (0 = all)")
 	cmd.Flags().BoolVar(&opts.compact, "compact", false, "emit compact JSON instead of indented")
 	cmd.Flags().StringVar(&opts.decodeSpecsPath, "decode-specs", "", "path to YAML file with per-field decode overrides (qualified fieldPath entries)")
-	cmd.Flags().BoolVar(&opts.fileHeader, "file-header", false, "input contains a 3GPP TS 32.297 CDR file header")
-	cmd.Flags().BoolVar(&opts.cdrHeader, "cdr-header", false, "each record is prefixed with a 3GPP TS 32.297 CDR record header")
+	cmd.Flags().BoolVar(&opts.fileHeader, "file-header", true, "input contains a 3GPP TS 32.297 CDR file header")
+	cmd.Flags().BoolVar(&opts.cdrHeader, "cdr-header", true, "each record is prefixed with a 3GPP TS 32.297 CDR record header")
+	cmd.Flags().BoolVar(&opts.suppressFileHeader, "suppress-file-header", false, "do not print parsed file header metadata")
+	cmd.Flags().BoolVar(&opts.suppressCDRHeader, "suppress-cdr-header", false, "do not print parsed CDR record header metadata")
 
 	_ = cmd.MarkFlagRequired("schema")
 	_ = cmd.MarkFlagRequired("type")
@@ -91,7 +99,6 @@ func runDecode(opts *decodeOptions, berPath string) error {
 	if !opts.compact {
 		enc.SetIndent("", "  ")
 	}
-	metaEnc := json.NewEncoder(os.Stderr)
 
 	fileReader := cdrfile.NewReader(data, cdrfile.Options{
 		HasFileHeader: opts.fileHeader,
@@ -103,11 +110,13 @@ func runDecode(opts *decodeOptions, berPath string) error {
 		if err != nil {
 			return fmt.Errorf("read file header: %w", err)
 		}
-		if err := metaEnc.Encode(map[string]any{
-			"headerType": "file",
-			"fileHeader": fh,
-		}); err != nil {
-			return fmt.Errorf("encode file header: %w", err)
+		if !opts.suppressFileHeader {
+			if err := enc.Encode(map[string]any{
+				"headerType": "file",
+				"fileHeader": fh,
+			}); err != nil {
+				return fmt.Errorf("encode file header: %w", err)
+			}
 		}
 	}
 
@@ -117,13 +126,15 @@ func runDecode(opts *decodeOptions, berPath string) error {
 			break
 		}
 
+		printCDRBanner(count + 1)
+
 		rh, cdrData, err := fileReader.NextRecord()
 		if err != nil {
 			return fmt.Errorf("read record %d: %w", count+1, err)
 		}
 
-		if opts.cdrHeader {
-			if err := metaEnc.Encode(map[string]any{
+		if opts.cdrHeader && !opts.suppressCDRHeader {
+			if err := enc.Encode(map[string]any{
 				"headerType":   "cdr",
 				"recordNumber": count + 1,
 				"cdrHeader":    rh,
@@ -148,4 +159,10 @@ func runDecode(opts *decodeOptions, berPath string) error {
 
 	fmt.Fprintf(os.Stderr, "decoded %d record(s)\n", count)
 	return nil
+}
+
+func printCDRBanner(n int) {
+	fmt.Fprintln(os.Stdout, "-----------------------------")
+	fmt.Fprintf(os.Stdout, "CDR #%d\n", n)
+	fmt.Fprintln(os.Stdout, "-----------------------------")
 }

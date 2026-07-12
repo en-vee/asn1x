@@ -178,8 +178,8 @@ func TestParseCHFChargingDataTypesEXP(t *testing.T) {
 		t.Fatalf("AMFID size = %#v", size)
 	}
 
-	if len(mod.Types) != 48 {
-		t.Fatalf("type assignments = %d, want 48", len(mod.Types))
+	if len(mod.Types) != 49 {
+		t.Fatalf("type assignments = %d, want 49", len(mod.Types))
 	}
 }
 
