@@ -176,10 +176,8 @@ func (d *Decoder) decodeComponentList(components []schema.Component, extensible 
 		}
 		comp, ok := d.matchComponent(components, tlv.Tag)
 		if !ok {
-			if extensible {
-				continue
-			}
-			return nil, fmt.Errorf("decode: unknown component tag class=%d number=%d", tlv.Tag.Class, tlv.Tag.Number)
+			out[unknownFieldName(tlv.Tag)] = hex.EncodeToString(tlv.Value)
+			continue
 		}
 		val, err := d.decodeComponent(*comp, tlv, path)
 		if err != nil {
@@ -369,6 +367,10 @@ func stringTypeTag(name string) int {
 
 func tagsEqual(a, b ber.Tag) bool {
 	return a.Class == b.Class && a.Number == b.Number && a.Constructed == b.Constructed
+}
+
+func unknownFieldName(tag ber.Tag) string {
+	return fmt.Sprintf("Unknown_%d", tag.Number)
 }
 
 func namedNumber(values map[string]int, n int) string {
