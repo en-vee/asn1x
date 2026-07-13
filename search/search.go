@@ -1,7 +1,9 @@
 package search
 
 import (
+	"compress/gzip"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -18,6 +20,7 @@ type Config struct {
 	DecodeSpecsPath string
 	FileHeader      bool
 	CDRHeader       bool
+	Gzip            bool
 }
 
 // Searcher decodes and searches BER-encoded CDR files.
@@ -26,6 +29,7 @@ type Searcher struct {
 	rootType   string
 	fileHeader bool
 	cdrHeader  bool
+	gzip       bool
 }
 
 // GrepOptions configures a search run.
@@ -76,6 +80,7 @@ func NewSearcher(cfg Config) (*Searcher, error) {
 		rootType:   cfg.RootType,
 		fileHeader: cfg.FileHeader,
 		cdrHeader:  cfg.CDRHeader,
+		gzip:       cfg.Gzip,
 	}, nil
 }
 
@@ -122,7 +127,7 @@ func (s *Searcher) Grep(opts GrepOptions) ([]Match, error) {
 }
 
 func (s *Searcher) grepFile(filter decode.PathFilter, path string, limit int, includeRecords bool) ([]Match, error) {
-	data, err := os.ReadFile(path)
+	data, err := readFileContent(path, s.gzip)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
@@ -173,4 +178,21 @@ func (s *Searcher) grepFile(filter decode.PathFilter, path string, limit int, in
 	}
 
 	return matches, nil
+}
+
+func readFileContent(path string, gzipEnabled bool) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if !gzipEnabled {
+		return io.ReadAll(f)
+	}
+	gr, err := gzip.NewReader(f)
+	if err != nil {
+		return nil, fmt.Errorf("gzip: %w", err)
+	}
+	defer gr.Close()
+	return io.ReadAll(gr)
 }
