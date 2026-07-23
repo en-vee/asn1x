@@ -79,6 +79,9 @@ func (d *Decoder) resolve(t schema.Type) schema.Type {
 
 func (d *Decoder) decodeTypeWithTLV(t schema.Type, tlv ber.TLV, path string) (any, error) {
 	t = d.resolve(t)
+	if tagged, ok := t.(schema.TaggedType); ok {
+		return d.decodeTaggedType(tagged, tlv, path)
+	}
 	switch typ := t.(type) {
 	case schema.ChoiceType:
 		return d.decodeChoice(typ, tlv, path)
@@ -93,6 +96,23 @@ func (d *Decoder) decodeTypeWithTLV(t schema.Type, tlv ber.TLV, path string) (an
 	default:
 		return d.decodePrimitive(t, tlv.Value)
 	}
+}
+
+func (d *Decoder) decodeTaggedType(tagged schema.TaggedType, tlv ber.TLV, path string) (any, error) {
+	innerType := d.resolve(tagged.Type)
+	// X.680 requires EXPLICIT tagging for CHOICE even in IMPLICIT TAGS modules.
+	explicit := !tagged.Implicit
+	if _, ok := innerType.(schema.ChoiceType); ok {
+		explicit = true
+	}
+	if !explicit {
+		return d.decodeTypeWithTLV(innerType, tlv, path)
+	}
+	inner, _, err := ber.ReadOne(tlv.Value)
+	if err != nil {
+		return nil, fmt.Errorf("decode: explicit tag: %w", err)
+	}
+	return d.decodeTypeWithTLV(innerType, inner, path)
 }
 
 func (d *Decoder) decodeChoice(choice schema.ChoiceType, tlv ber.TLV, path string) (any, error) {
@@ -292,18 +312,34 @@ func (d *Decoder) expectedTag(comp schema.Component) ber.Tag {
 		return ber.Tag{
 			Class:       ber.Class(comp.Tag.Class),
 			Number:      comp.Tag.Number,
-			Constructed: isConstructedType(typ),
+			Constructed: d.isConstructedType(typ),
 		}
 	}
-	return universalTag(typ)
+	if tagged, ok := typ.(schema.TaggedType); ok {
+		return ber.Tag{
+			Class:       ber.Class(tagged.Tag.Class),
+			Number:      tagged.Tag.Number,
+			Constructed: d.isConstructedType(tagged.Type),
+		}
+	}
+	return universalTag(d.underlyingType(typ))
 }
 
-func isConstructedType(t schema.Type) bool {
-	switch t.(type) {
+func (d *Decoder) underlyingType(t schema.Type) schema.Type {
+	t = d.resolve(t)
+	for {
+		tagged, ok := t.(schema.TaggedType)
+		if !ok {
+			return t
+		}
+		t = d.resolve(tagged.Type)
+	}
+}
+
+func (d *Decoder) isConstructedType(t schema.Type) bool {
+	switch d.underlyingType(t).(type) {
 	case schema.SetType, schema.SequenceType, schema.ChoiceType, schema.SequenceOfType, schema.SetOfType:
 		return true
-	case schema.ReferenceType:
-		return false
 	default:
 		return false
 	}

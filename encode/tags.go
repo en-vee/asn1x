@@ -11,14 +11,32 @@ func (e *Encoder) expectedTag(comp schema.Component) ber.Tag {
 		return ber.Tag{
 			Class:       ber.Class(comp.Tag.Class),
 			Number:      comp.Tag.Number,
-			Constructed: isConstructedType(typ),
+			Constructed: e.isConstructedType(typ),
 		}
 	}
-	return universalTag(typ)
+	if tagged, ok := typ.(schema.TaggedType); ok {
+		return ber.Tag{
+			Class:       ber.Class(tagged.Tag.Class),
+			Number:      tagged.Tag.Number,
+			Constructed: e.isConstructedType(tagged.Type),
+		}
+	}
+	return universalTag(e.underlyingType(typ))
 }
 
-func isConstructedType(t schema.Type) bool {
-	switch t.(type) {
+func (e *Encoder) underlyingType(t schema.Type) schema.Type {
+	t = e.resolve(t)
+	for {
+		tagged, ok := t.(schema.TaggedType)
+		if !ok {
+			return t
+		}
+		t = e.resolve(tagged.Type)
+	}
+}
+
+func (e *Encoder) isConstructedType(t schema.Type) bool {
+	switch e.underlyingType(t).(type) {
 	case schema.SetType, schema.SequenceType, schema.ChoiceType, schema.SequenceOfType, schema.SetOfType:
 		return true
 	default:

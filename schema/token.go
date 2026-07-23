@@ -16,6 +16,8 @@ const (
 	TokenDEFAULT
 	TokenIMPLICIT
 	TokenEXPLICIT
+	TokenAUTOMATIC
+	TokenTAGS
 	TokenTRUE
 	TokenFALSE
 	TokenNULL
@@ -90,6 +92,10 @@ func (k TokenKind) String() string {
 		return "IMPLICIT"
 	case TokenEXPLICIT:
 		return "EXPLICIT"
+	case TokenAUTOMATIC:
+		return "AUTOMATIC"
+	case TokenTAGS:
+		return "TAGS"
 	case TokenTRUE:
 		return "TRUE"
 	case TokenFALSE:

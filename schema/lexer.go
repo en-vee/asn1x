@@ -268,6 +268,10 @@ func keywordKind(word string) TokenKind {
 		return TokenIMPLICIT
 	case "EXPLICIT":
 		return TokenEXPLICIT
+	case "AUTOMATIC":
+		return TokenAUTOMATIC
+	case "TAGS":
+		return TokenTAGS
 	case "TRUE":
 		return TokenTRUE
 	case "FALSE":

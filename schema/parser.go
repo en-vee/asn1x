@@ -12,10 +12,11 @@ func Parse(r io.Reader) (*Schema, error) {
 }
 
 type parser struct {
-	lex   *lexer
-	curr  Token
-	peek  Token
-	hasPK bool
+	lex        *lexer
+	curr       Token
+	peek       Token
+	hasPK      bool
+	tagDefault TagDefault
 }
 
 func newParser(l *lexer) *parser {
@@ -48,6 +49,13 @@ func (p *parser) parseModule() (*Schema, error) {
 	if err := p.expectKind(TokenDEFINITIONS); err != nil {
 		return nil, err
 	}
+	tagDefault, err := p.parseTagDefault()
+	if err != nil {
+		return nil, err
+	}
+	p.tagDefault = tagDefault
+	schema.TagDefault = tagDefault
+
 	if err := p.expectKind(TokenColonColonEquals); err != nil {
 		return nil, err
 	}
@@ -70,6 +78,39 @@ func (p *parser) parseModule() (*Schema, error) {
 		return nil, err
 	}
 	return schema, nil
+}
+
+// parseTagDefault parses an optional IMPLICIT/EXPLICIT/AUTOMATIC TAGS clause.
+// ASN.1 default when omitted is EXPLICIT TAGS.
+func (p *parser) parseTagDefault() (TagDefault, error) {
+	switch p.curr.Kind {
+	case TokenIMPLICIT:
+		if err := p.advance(); err != nil {
+			return TagDefaultExplicit, err
+		}
+		if err := p.expectKind(TokenTAGS); err != nil {
+			return TagDefaultExplicit, err
+		}
+		return TagDefaultImplicit, nil
+	case TokenEXPLICIT:
+		if err := p.advance(); err != nil {
+			return TagDefaultExplicit, err
+		}
+		if err := p.expectKind(TokenTAGS); err != nil {
+			return TagDefaultExplicit, err
+		}
+		return TagDefaultExplicit, nil
+	case TokenAUTOMATIC:
+		if err := p.advance(); err != nil {
+			return TagDefaultExplicit, err
+		}
+		if err := p.expectKind(TokenTAGS); err != nil {
+			return TagDefaultExplicit, err
+		}
+		return TagDefaultAutomatic, nil
+	default:
+		return TagDefaultExplicit, nil
+	}
 }
 
 func (p *parser) parseModuleOID() (string, error) {
@@ -128,7 +169,8 @@ func stringsHasSuffixParen(s string) bool {
 }
 
 func (p *parser) parseAssignment() (Assignment, error) {
-	nameTok, err := p.expect(TokenIdent)
+	// Type names may collide with constraint keywords (e.g. TAP's Min).
+	nameTok, err := p.expectNamedLabel()
 	if err != nil {
 		return Assignment{}, err
 	}
@@ -144,6 +186,8 @@ func (p *parser) parseAssignment() (Assignment, error) {
 
 func (p *parser) parseType() (Type, error) {
 	switch p.curr.Kind {
+	case TokenLBracket:
+		return p.parseTaggedType()
 	case TokenCHOICE:
 		return p.parseChoiceType()
 	case TokenSEQUENCE:
@@ -230,7 +274,8 @@ func (p *parser) parseType() (Type, error) {
 		return p.parseUTCTimeType()
 	case TokenGeneralizedTime:
 		return p.parseGeneralizedTimeType()
-	case TokenIdent:
+	case TokenIdent, TokenMIN, TokenMAX:
+		// MIN/MAX are constraint keywords but also legal type names (e.g. TAP Min).
 		return p.parseReferenceOrBuiltinType()
 	default:
 		return nil, p.error(p.curr, "expected type")
@@ -519,6 +564,54 @@ func (p *parser) parseComponentList() ([]Component, bool, error) {
 	return components, extensible, nil
 }
 
+func (p *parser) parseTaggedType() (Type, error) {
+	tag, err := p.parseTag()
+	if err != nil {
+		return nil, err
+	}
+	implicit, err := p.parseTaggingMode(true)
+	if err != nil {
+		return nil, err
+	}
+	inner, err := p.parseType()
+	if err != nil {
+		return nil, err
+	}
+	// X.680: a tagged CHOICE type uses EXPLICIT tagging.
+	if _, ok := inner.(ChoiceType); ok {
+		implicit = false
+	}
+	return TaggedType{Tag: *tag, Implicit: implicit, Type: inner}, nil
+}
+
+// parseTaggingMode reads an optional IMPLICIT/EXPLICIT keyword.
+// When tagged is true and neither keyword is present, the module TagDefault applies
+// (AUTOMATIC and IMPLICIT both yield implicit tagging).
+func (p *parser) parseTaggingMode(tagged bool) (implicit bool, err error) {
+	switch p.curr.Kind {
+	case TokenIMPLICIT:
+		if err := p.advance(); err != nil {
+			return false, err
+		}
+		return true, nil
+	case TokenEXPLICIT:
+		if err := p.advance(); err != nil {
+			return false, err
+		}
+		return false, nil
+	default:
+		if !tagged {
+			return false, nil
+		}
+		switch p.tagDefault {
+		case TagDefaultImplicit, TagDefaultAutomatic:
+			return true, nil
+		default:
+			return false, nil
+		}
+	}
+}
+
 func (p *parser) parseComponent() (Component, error) {
 	nameTok, err := p.expectNamedLabel()
 	if err != nil {
@@ -535,23 +628,23 @@ func (p *parser) parseComponent() (Component, error) {
 		comp.Tag = tag
 	}
 
-	switch p.curr.Kind {
-	case TokenIMPLICIT:
-		comp.Implicit = true
-		if err := p.advance(); err != nil {
-			return Component{}, err
-		}
-	case TokenEXPLICIT:
-		if err := p.advance(); err != nil {
-			return Component{}, err
-		}
+	implicit, err := p.parseTaggingMode(comp.Tag != nil)
+	if err != nil {
+		return Component{}, err
 	}
+	comp.Implicit = implicit
 
 	typ, err := p.parseType()
 	if err != nil {
 		return Component{}, err
 	}
 	comp.Type = typ
+	// X.680: a tagged CHOICE component uses EXPLICIT tagging.
+	if comp.Tag != nil {
+		if _, ok := typ.(ChoiceType); ok {
+			comp.Implicit = false
+		}
+	}
 
 	if p.curr.Kind == TokenOPTIONAL {
 		comp.Optional = true

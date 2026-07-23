@@ -52,6 +52,9 @@ func (e *Encoder) resolve(t schema.Type) schema.Type {
 
 func (e *Encoder) encodeType(t schema.Type, v any, path string) ([]byte, error) {
 	t = e.resolve(t)
+	if tagged, ok := t.(schema.TaggedType); ok {
+		return e.encodeTaggedType(tagged, v, path)
+	}
 	switch typ := t.(type) {
 	case schema.ChoiceType:
 		return e.encodeChoice(typ, v, path)
@@ -86,6 +89,35 @@ func (e *Encoder) encodeType(t schema.Type, v any, path string) ([]byte, error) 
 		}
 		return ber.EncodeTLV(universalTag(t), content), nil
 	}
+}
+
+func (e *Encoder) encodeTaggedType(tagged schema.TaggedType, v any, path string) ([]byte, error) {
+	innerType := e.resolve(tagged.Type)
+	// X.680 requires EXPLICIT tagging for CHOICE even in IMPLICIT TAGS modules.
+	explicit := !tagged.Implicit
+	if _, ok := e.underlyingType(innerType).(schema.ChoiceType); ok {
+		explicit = true
+	}
+	if !explicit {
+		content, err := e.encodeTypeContent(innerType, v, path)
+		if err != nil {
+			return nil, err
+		}
+		return ber.EncodeTLV(ber.Tag{
+			Class:       ber.Class(tagged.Tag.Class),
+			Number:      tagged.Tag.Number,
+			Constructed: e.isConstructedType(innerType),
+		}, content), nil
+	}
+	inner, err := e.encodeType(innerType, v, path)
+	if err != nil {
+		return nil, err
+	}
+	return ber.EncodeTLV(ber.Tag{
+		Class:       ber.Class(tagged.Tag.Class),
+		Number:      tagged.Tag.Number,
+		Constructed: true,
+	}, inner), nil
 }
 
 func (e *Encoder) encodeChoice(choice schema.ChoiceType, v any, path string) ([]byte, error) {
@@ -233,7 +265,13 @@ func (e *Encoder) encodeImplicitChoice(choice schema.ChoiceType, outer schema.Co
 // (used for IMPLICIT tagging where the context tag replaces the universal tag).
 func (e *Encoder) encodeTypeContent(t schema.Type, v any, path string) ([]byte, error) {
 	t = e.resolve(t)
+	if tagged, ok := t.(schema.TaggedType); ok {
+		// Outer tag already applied by caller; encode the underlying content.
+		return e.encodeTypeContent(tagged.Type, v, path)
+	}
 	switch typ := t.(type) {
+	case schema.ChoiceType:
+		return e.encodeChoice(typ, v, path)
 	case schema.SetType:
 		return e.encodeComponentList(typ.Components, v, path)
 	case schema.SequenceType:

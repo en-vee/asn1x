@@ -40,6 +40,17 @@ const (
 	KindChoice
 	KindSequenceOf
 	KindSetOf
+	KindTagged
+)
+
+// TagDefault is the module tagging default (X.680 TagDefault).
+type TagDefault int
+
+const (
+	// TagDefaultExplicit is the ASN.1 default when no TAGS clause is present.
+	TagDefaultExplicit TagDefault = iota
+	TagDefaultImplicit
+	TagDefaultAutomatic
 )
 
 // Type is a parsed ASN.1 type definition.
@@ -156,6 +167,15 @@ type GeneralizedTimeType struct {
 
 func (GeneralizedTimeType) TypeKind() Kind { return KindGeneralizedTime }
 
+// TaggedType applies an ASN.1 tag to another type (e.g. [APPLICATION 1] SEQUENCE).
+type TaggedType struct {
+	Tag      Tag
+	Implicit bool
+	Type     Type
+}
+
+func (TaggedType) TypeKind() Kind { return KindTagged }
+
 // Component is one member of a SEQUENCE, SET, or CHOICE type.
 type Component struct {
 	Name     string
@@ -238,6 +258,7 @@ type Assignment struct {
 type Schema struct {
 	ModuleName string
 	ModuleOID  string
+	TagDefault TagDefault
 	Types      map[string]Type
 }
 
