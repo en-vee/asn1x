@@ -8,6 +8,10 @@ import (
 )
 
 func loadSchemaAndSpecs(opts sharedDecodeOptions) (*asn1x.Schema, map[string]string, error) {
+	if err := requireSchemaAndType(opts); err != nil {
+		return nil, nil, err
+	}
+
 	schemaFile, err := os.Open(opts.schemaPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("open schema: %w", err)

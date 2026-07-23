@@ -52,6 +52,10 @@ Use --print-matches to also emit the decoded JSON for each matching record.`,
 }
 
 func runGrep(opts *grepOptions, searchPath string) error {
+	if err := requireSchemaAndType(opts.sharedDecodeOptions); err != nil {
+		return err
+	}
+
 	searcher, err := search.NewSearcher(search.Config{
 		SchemaPath:        opts.schemaPath,
 		RootType:          opts.rootType,

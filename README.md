@@ -78,17 +78,31 @@ asn1x decode \
   sample-asn1-files/vvsl22183_-_87150.20220429_._1113+1000.asn1
 ```
 
+Anonymous wrapped TLV dump (no schema; each node is `tag` / `class` / `constructed` / `length` / `value`):
+
+```bash
+asn1x decode \
+  --tlv \
+  --file-header=false \
+  --cdr-header=false \
+  --limit 1 \
+  sample-asn1-files/vvsl22183_-_87150.20220429_._1113+1000.asn1
+```
+
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--schema` | yes | Path to the ASN.1 schema file |
-| `--type` | yes | Root type name to decode (e.g. `CHFRecord`) |
+| `--schema` | yes\* | Path to the ASN.1 schema file |
+| `--type` | yes\* | Root type name to decode (e.g. `CHFRecord`) |
 | `--spec-overrides` | no | Path to a YAML file with per-field wire-type overrides |
+| `--tlv` | no | Dump anonymous wrapped TLV JSON (ignores schema / spec-overrides) |
 | `--limit` | no | Maximum number of records to decode (`0` = all) |
 | `--compact` | no | Emit compact JSON instead of indented output |
 | `--file-header` | no | Input contains a 3GPP TS 32.297 CDR file header (default: `true`) |
 | `--cdr-header` | no | Each record is prefixed with a 3GPP TS 32.297 CDR record header (default: `true`) |
 | `--suppress-file-header` | no | Do not print parsed file header metadata (default: `false`) |
 | `--suppress-cdr-header` | no | Do not print parsed CDR record header metadata (default: `false`) |
+
+\* Not required when `--tlv` is set.
 
 The BER file is passed as a positional argument.
 
@@ -333,6 +347,33 @@ for len(data) > 0 {
     fmt.Println(string(jsonBytes))
 }
 ```
+
+### Dump anonymous wrapped TLV JSON (no schema)
+
+```go
+data, _ := os.ReadFile("record.asn1")
+
+node, err := asn1x.DumpTLV(data)
+if err != nil {
+    panic(err)
+}
+jsonBytes, _ := asn1x.ToJSON(node)
+fmt.Println(string(jsonBytes))
+```
+
+Each node looks like:
+
+```json
+{
+  "tag": 200,
+  "class": "CONTEXT",
+  "constructed": true,
+  "length": 1234,
+  "value": [ { "tag": 0, "class": "CONTEXT", "constructed": false, "length": 1, "value": "00" } ]
+}
+```
+
+Universal INTEGER / BOOLEAN / OID / string types are decoded into JSON scalars; other primitive content is text when printable, otherwise hex.
 
 ### Encode a Go value or JSON to BER
 

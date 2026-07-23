@@ -16,6 +16,7 @@ type decodeOptions struct {
 	compact            bool
 	suppressFileHeader bool
 	suppressCDRHeader  bool
+	tlv                bool
 }
 
 func newDecodeCmd() *cobra.Command {
@@ -28,6 +29,11 @@ func newDecodeCmd() *cobra.Command {
 
 When the input contains multiple records, each is preceded by a CDR #N banner
 followed by indented or compact JSON.
+
+Use --tlv for an anonymous wrapped TLV dump (no schema required). Each node is
+{"tag","class","constructed","length","value"}; constructed values nest as
+arrays of child nodes. --schema, --type, and --spec-overrides are ignored in
+TLV mode.
 
 For 3GPP TS 32.297 CDR files, --file-header and --cdr-header declare the input
 framing (both default to true). Use --suppress-file-header and/or
@@ -43,16 +49,12 @@ skipping those bytes during decode.`,
 	cmd.Flags().BoolVar(&opts.compact, "compact", false, "emit compact JSON instead of indented")
 	cmd.Flags().BoolVar(&opts.suppressFileHeader, "suppress-file-header", false, "do not print parsed file header metadata")
 	cmd.Flags().BoolVar(&opts.suppressCDRHeader, "suppress-cdr-header", false, "do not print parsed CDR record header metadata")
+	cmd.Flags().BoolVar(&opts.tlv, "tlv", false, "dump anonymous wrapped TLV JSON (no schema; ignores --spec-overrides)")
 
 	return cmd
 }
 
 func runDecode(opts *decodeOptions, berPath string) error {
-	mod, fieldSpecs, err := loadSchemaAndSpecs(opts.sharedDecodeOptions)
-	if err != nil {
-		return err
-	}
-
 	berFile, err := os.Open(berPath)
 	if err != nil {
 		return fmt.Errorf("open ber file: %w", err)
@@ -64,7 +66,6 @@ func runDecode(opts *decodeOptions, berPath string) error {
 		return fmt.Errorf("read ber file: %w", err)
 	}
 
-	dec := asn1x.NewDecoderWithOptions(mod, asn1x.DecodeOptions{FieldSpecs: fieldSpecs})
 	enc := json.NewEncoder(os.Stdout)
 	if !opts.compact {
 		enc.SetIndent("", "  ")
@@ -90,6 +91,15 @@ func runDecode(opts *decodeOptions, berPath string) error {
 		}
 	}
 
+	var dec *asn1x.Decoder
+	if !opts.tlv {
+		mod, fieldSpecs, err := loadSchemaAndSpecs(opts.sharedDecodeOptions)
+		if err != nil {
+			return err
+		}
+		dec = asn1x.NewDecoderWithOptions(mod, asn1x.DecodeOptions{FieldSpecs: fieldSpecs})
+	}
+
 	count := 0
 	for fileReader.Remaining() > 0 {
 		if opts.limit > 0 && count >= opts.limit {
@@ -113,7 +123,12 @@ func runDecode(opts *decodeOptions, berPath string) error {
 			}
 		}
 
-		val, err := dec.DecodeBytes(opts.rootType, cdrData)
+		var val any
+		if opts.tlv {
+			val, err = asn1x.DumpTLV(cdrData)
+		} else {
+			val, err = dec.DecodeBytes(opts.rootType, cdrData)
+		}
 		if err != nil {
 			return fmt.Errorf("decode record %d: %w", count+1, err)
 		}

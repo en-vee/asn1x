@@ -1,6 +1,10 @@
 package cli
 
-import "github.com/spf13/cobra"
+import (
+	"fmt"
+
+	"github.com/spf13/cobra"
+)
 
 type sharedDecodeOptions struct {
 	schemaPath        string
@@ -18,7 +22,14 @@ func bindSharedDecodeFlags(cmd *cobra.Command, opts *sharedDecodeOptions) {
 	cmd.Flags().StringVar(&opts.specOverridesPath, "spec-overrides", "", "path to YAML file with per-field wire-type overrides (qualified fieldPath entries)")
 	cmd.Flags().BoolVar(&opts.fileHeader, "file-header", true, "input contains a 3GPP TS 32.297 CDR file header")
 	cmd.Flags().BoolVar(&opts.cdrHeader, "cdr-header", true, "each record is prefixed with a 3GPP TS 32.297 CDR record header")
+}
 
-	_ = cmd.MarkFlagRequired("schema")
-	_ = cmd.MarkFlagRequired("type")
+func requireSchemaAndType(opts sharedDecodeOptions) error {
+	if opts.schemaPath == "" {
+		return fmt.Errorf("--schema is required")
+	}
+	if opts.rootType == "" {
+		return fmt.Errorf("--type is required")
+	}
+	return nil
 }
