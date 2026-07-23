@@ -1,17 +1,15 @@
 # asn1x
 
-Go library and command-line utility for parsing ASN.1 schema definitions and decoding BER-encoded ASN.1 data into JSON using those schemas.
+Go library and command-line utility for parsing ASN.1 schema definitions and converting between BER-encoded ASN.1 data and JSON using those schemas.
 
 ## Features
 
 - Parse ASN.1 module definitions (`.asn`, `.EXP`, and similar syntax files)
-- Schema-driven BER decoding with field names taken from the schema
-- JSON output with sensible type mappings (SEQUENCE/SET → object, SEQUENCE OF/SET OF → array, CHOICE → single-key object)
-- Optional per-field decode overrides via YAML (`fieldPath` + `asn1DataType`) for cases where the on-wire encoding does not match the schema type
+- Schema-driven BER decoding and encoding with field names taken from the schema
+- JSON mapping with sensible type conversions (SEQUENCE/SET → object, SEQUENCE OF/SET OF → array, CHOICE → single-key object)
+- Optional per-field wire-type overrides via YAML (`fieldPath` + `asn1DataType`) for cases where the on-wire encoding does not match the schema type (used by both decode and encode)
 - `grep` subcommand to find CDR records matching a decoded field value across files or directories
 - `asn1x` CLI built with [Cobra](https://github.com/spf13/cobra)
-
-JSON-to-ASN.1 encoding is not implemented yet.
 
 ## Requirements
 
@@ -33,6 +31,44 @@ go install ./cmd/asn1x
 
 ## CLI usage
 
+### Encode JSON to BER
+
+```bash
+asn1x encode \
+  --schema schema/testdata/CHFChargingDataTypes.EXP \
+  --type CHFRecord \
+  --spec-overrides decode/testdata/chf-decode-specs.yaml \
+  --output records.ber \
+  records.json
+```
+
+JSON may also be read from stdin when no file argument is given.
+
+**Input formats:**
+
+- A single JSON object (one record)
+- A JSON array of objects (multiple records), encoded back-to-back as concatenated BER
+- JSON Lines / NDJSON (one object per line)
+
+Example multi-record array:
+
+```json
+[
+  { "chargingFunctionRecord": { "...": "..." } },
+  { "chargingFunctionRecord": { "...": "..." } }
+]
+```
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--schema` | yes | Path to the ASN.1 schema file |
+| `--type` | yes | Root type name to encode (e.g. `CHFRecord`) |
+| `--spec-overrides` | no | Path to a YAML file with per-field wire-type overrides (same file as decode) |
+| `--output` / `-o` | no | Write BER to this file (default: stdout) |
+| `--limit` | no | Maximum number of records to encode (`0` = all) |
+
+**Output:** Concatenated BER records are written to `--output`, or to **stdout** if omitted. Progress is reported on stderr (`encoded N record(s)`).
+
 ### Decode BER data to JSON
 
 ```bash
@@ -46,7 +82,7 @@ asn1x decode \
 |------|----------|-------------|
 | `--schema` | yes | Path to the ASN.1 schema file |
 | `--type` | yes | Root type name to decode (e.g. `CHFRecord`) |
-| `--decode-specs` | no | Path to a YAML file with per-field decode overrides |
+| `--spec-overrides` | no | Path to a YAML file with per-field wire-type overrides |
 | `--limit` | no | Maximum number of records to decode (`0` = all) |
 | `--compact` | no | Emit compact JSON instead of indented output |
 | `--file-header` | no | Input contains a 3GPP TS 32.297 CDR file header (default: `true`) |
@@ -82,7 +118,7 @@ Decode all records to a JSONL file with field decode overrides:
 asn1x decode \
   --schema schema/testdata/CHFChargingDataTypes.EXP \
   --type CHFRecord \
-  --decode-specs decode/testdata/chf-decode-specs.yaml \
+  --spec-overrides decode/testdata/chf-decode-specs.yaml \
   sample-asn1-files/vvsl22183_-_87150.20220429_._1113+1000.asn1 > records.jsonl
 ```
 
@@ -92,7 +128,7 @@ Decode a 3GPP TS 32.297 CDR file (default framing; headers printed to stdout):
 asn1x decode \
   --schema schema/testdata/CHFChargingDataTypes.EXP \
   --type CHFRecord \
-  --decode-specs decode/testdata/chf-decode-specs.yaml \
+  --spec-overrides decode/testdata/chf-decode-specs.yaml \
   cdr-file.dat
 ```
 
@@ -122,11 +158,12 @@ Show help:
 ```bash
 asn1x --help
 asn1x decode --help
+asn1x encode --help
 ```
 
 ### Search CDR files (`grep`)
 
-Find records whose **decoded** JSON contains a specific field value. Matching uses the same schema and decode-specs as `decode`, so values like `TimeStamp`, `MSTimeZone`, and `PLMNID` are compared after transformation — not as raw BER bytes.
+Find records whose **decoded** JSON contains a specific field value. Matching uses the same schema and spec-overrides as `decode`, so values like `TimeStamp`, `MSTimeZone`, and `PLMNID` are compared after transformation — not as raw BER bytes.
 
 Pass a **single file** or a **directory** as the positional argument. Directories are searched recursively.
 
@@ -134,7 +171,7 @@ Pass a **single file** or a **directory** as the positional argument. Directorie
 asn1x grep \
   --schema schema/testdata/CHFChargingDataTypes.EXP \
   --type CHFRecord \
-  --decode-specs decode/testdata/chf-decode-specs.yaml \
+  --spec-overrides decode/testdata/chf-decode-specs.yaml \
   --json-path 'chargingFunctionRecord.listOfMultipleUnitUsage.usedUnitContainers.pDUContainerInformation.uETimeZone==+10:00+1' \
   sample-asn1-files
 ```
@@ -144,7 +181,7 @@ asn1x grep \
 | `--schema` | yes | Path to the ASN.1 schema file |
 | `--type` | yes | Root type name to decode (e.g. `CHFRecord`) |
 | `--json-path` | yes | Field filter in the form `field.path==value` |
-| `--decode-specs` | no | Path to a YAML file with per-field decode overrides |
+| `--spec-overrides` | no | Path to a YAML file with per-field wire-type overrides |
 | `--limit` | no | Maximum number of records to scan per file (`0` = all) |
 | `--file-header` | no | Input contains a 3GPP TS 32.297 CDR file header (default: `true`) |
 | `--cdr-header` | no | Each record is prefixed with a 3GPP TS 32.297 CDR record header (default: `true`) |
@@ -169,7 +206,7 @@ Search a single CDR file for a specific duration:
 asn1x grep \
   --schema schema/testdata/CHFChargingDataTypes.EXP \
   --type CHFRecord \
-  --decode-specs decode/testdata/chf-decode-specs.yaml \
+  --spec-overrides decode/testdata/chf-decode-specs.yaml \
   --file-header=false \
   --cdr-header=false \
   --json-path 'chargingFunctionRecord.duration==148' \
@@ -182,18 +219,18 @@ Search a 3GPP CDR file for records with a given SMF trigger:
 asn1x grep \
   --schema schema/testdata/CHFChargingDataTypes.EXP \
   --type CHFRecord \
-  --decode-specs decode/testdata/chf-decode-specs.yaml \
+  --spec-overrides decode/testdata/chf-decode-specs.yaml \
   --json-path 'chargingFunctionRecord.listOfMultipleUnitUsage.usedUnitContainers.triggers.sMFTrigger==endOfPDUSession' \
   sample-asn1-files/iot-sftp-sink-m3c1-0_-_000001.20260709_-_125346+1000
 ```
 
-Search by PLMN (requires `PLMNID` entries in decode-specs):
+Search by PLMN (requires `PLMNID` entries in spec-overrides):
 
 ```bash
 asn1x grep \
   --schema schema/testdata/CHFChargingDataTypes.EXP \
   --type CHFRecord \
-  --decode-specs decode/testdata/chf-decode-specs.yaml \
+  --spec-overrides decode/testdata/chf-decode-specs.yaml \
   --json-path 'chargingFunctionRecord.nFunctionConsumerInformation.networkFunctionPLMNIdentifier.mcc==505' \
   sample-asn1-files
 ```
@@ -204,7 +241,7 @@ Print matching records as JSON:
 asn1x grep \
   --schema schema/testdata/CHFChargingDataTypes.EXP \
   --type CHFRecord \
-  --decode-specs decode/testdata/chf-decode-specs.yaml \
+  --spec-overrides decode/testdata/chf-decode-specs.yaml \
   --json-path 'chargingFunctionRecord.duration==148' \
   --print-matches \
   sample-asn1-files/iot-1.ber
@@ -297,9 +334,29 @@ for len(data) > 0 {
 }
 ```
 
-### Per-field decode overrides
+### Encode a Go value or JSON to BER
 
-Some deployments encode values differently from what the schema declares (for example, timestamps carried as 9-byte BCD `TimeStamp` octet strings instead of BER `GeneralizedTime`). Use a YAML specs file and pass it to the decoder:
+```go
+schema, _ := asn1x.Parse(schemaFile)
+specs, _ := asn1x.LoadFieldSpecsFile("decode/testdata/chf-decode-specs.yaml")
+
+enc := asn1x.NewEncoderWithOptions(schema, asn1x.EncodeOptions{
+    FieldSpecs: specs,
+})
+
+// From a decoded (or hand-built) Go value:
+berBytes, err := enc.EncodeBytes("CHFRecord", val)
+if err != nil {
+    panic(err)
+}
+
+// Or directly from JSON:
+berBytes, err = enc.EncodeJSON("CHFRecord", jsonBytes)
+```
+
+### Per-field wire-type overrides
+
+Some deployments encode values differently from what the schema declares (for example, timestamps carried as 9-byte BCD `TimeStamp` octet strings instead of BER `GeneralizedTime`). Use a YAML specs file and pass it to the decoder and encoder:
 
 ```go
 specs, err := asn1x.LoadFieldSpecsFile("decode/testdata/chf-decode-specs.yaml")
@@ -308,6 +365,10 @@ if err != nil {
 }
 
 dec := asn1x.NewDecoderWithOptions(schema, asn1x.DecodeOptions{
+    FieldSpecs: specs,
+})
+
+enc := asn1x.NewEncoderWithOptions(schema, asn1x.EncodeOptions{
     FieldSpecs: specs,
 })
 
@@ -357,8 +418,9 @@ Optional components omitted from the BER encoding are omitted from the JSON outp
 
 ```
 asn1x/
-  ber/           BER TLV parsing
+  ber/           BER TLV parsing and encoding
   decode/        Schema-driven decoder and JSON output
+  encode/        Schema-driven JSON/Go-value → BER encoder
   schema/        ASN.1 schema parser
   cmd/asn1x/     asn1x CLI (Cobra)
   sample-asn1-files/   Sample BER data files
@@ -373,5 +435,6 @@ go test ./...
 ## Limitations
 
 - Indefinite-length BER is not supported
-- Information object references (e.g. `DMI-EXTENSION.&id`) are decoded with best-effort fallback
-- JSON-to-ASN.1 encoding is not implemented
+- Information object references (e.g. `DMI-EXTENSION.&id`) are decoded/encoded with best-effort fallback
+- Extension fields decoded as `Unknown_<tag>` are not re-encoded
+- CDR file header wrapping is not applied on encode (encode emits raw BER records)

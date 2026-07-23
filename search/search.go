@@ -15,12 +15,12 @@ import (
 
 // Config configures schema loading and CDR file framing for search.
 type Config struct {
-	SchemaPath      string
-	RootType        string
-	DecodeSpecsPath string
-	FileHeader      bool
-	CDRHeader       bool
-	Gzip            bool
+	SchemaPath        string
+	RootType          string
+	SpecOverridesPath string
+	FileHeader        bool
+	CDRHeader         bool
+	Gzip              bool
 }
 
 // Searcher decodes and searches BER-encoded CDR files.
@@ -47,7 +47,7 @@ type Match struct {
 	Record    any    `json:"record,omitempty"`
 }
 
-// NewSearcher loads schema and decode specs and returns a reusable searcher.
+// NewSearcher loads schema and optional spec overrides and returns a reusable searcher.
 func NewSearcher(cfg Config) (*Searcher, error) {
 	if cfg.SchemaPath == "" {
 		return nil, fmt.Errorf("schema path is required")
@@ -68,10 +68,10 @@ func NewSearcher(cfg Config) (*Searcher, error) {
 	}
 
 	var fieldSpecs map[string]string
-	if cfg.DecodeSpecsPath != "" {
-		fieldSpecs, err = asn1x.LoadFieldSpecsFile(cfg.DecodeSpecsPath)
+	if cfg.SpecOverridesPath != "" {
+		fieldSpecs, err = asn1x.LoadFieldSpecsFile(cfg.SpecOverridesPath)
 		if err != nil {
-			return nil, fmt.Errorf("load decode specs: %w", err)
+			return nil, fmt.Errorf("load spec overrides: %w", err)
 		}
 	}
 

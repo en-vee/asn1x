@@ -25,7 +25,7 @@ func newGrepCmd() *cobra.Command {
 		Long: `Search BER-encoded CDR files for records whose decoded JSON contains a field value.
 
 Each file under path is decoded using the same options as the decode command (except
-JSON output flags). Matching is performed on decoded values, so decode-specs
+JSON output flags). Matching is performed on decoded values, so spec-overrides
 transformations such as TimeStamp, MSTimeZone, and PLMNID apply.
 
 The --json-path flag uses the form field.path==value. Arrays along the path are
@@ -53,11 +53,11 @@ Use --print-matches to also emit the decoded JSON for each matching record.`,
 
 func runGrep(opts *grepOptions, searchPath string) error {
 	searcher, err := search.NewSearcher(search.Config{
-		SchemaPath:      opts.schemaPath,
-		RootType:        opts.rootType,
-		DecodeSpecsPath: opts.decodeSpecsPath,
-		FileHeader:      opts.fileHeader,
-		CDRHeader:       opts.cdrHeader,
+		SchemaPath:        opts.schemaPath,
+		RootType:          opts.rootType,
+		SpecOverridesPath: opts.specOverridesPath,
+		FileHeader:        opts.fileHeader,
+		CDRHeader:         opts.cdrHeader,
 	})
 	if err != nil {
 		return err

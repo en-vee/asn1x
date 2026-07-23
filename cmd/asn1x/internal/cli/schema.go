@@ -20,10 +20,10 @@ func loadSchemaAndSpecs(opts sharedDecodeOptions) (*asn1x.Schema, map[string]str
 	}
 
 	var fieldSpecs map[string]string
-	if opts.decodeSpecsPath != "" {
-		fieldSpecs, err = asn1x.LoadFieldSpecsFile(opts.decodeSpecsPath)
+	if opts.specOverridesPath != "" {
+		fieldSpecs, err = asn1x.LoadFieldSpecsFile(opts.specOverridesPath)
 		if err != nil {
-			return nil, nil, fmt.Errorf("load decode specs: %w", err)
+			return nil, nil, fmt.Errorf("load spec overrides: %w", err)
 		}
 	}
 
